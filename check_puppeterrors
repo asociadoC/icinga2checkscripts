@@ -19,8 +19,6 @@ done
 
 URL='https://'${HOSTNAME}'/api/v2/hosts?search=last_report+>+"35+minutes+ago"+and+(status.failed+>+0+or+status.failed_restarts+>+0)+and+status.enabled+=+true'
 
-echo ${URL}
-
 curl -s -k -u ${USERNAME}:${PASSWORD} ${URL} > /tmp/foremanerrors.tmp
 
 if [ ! $? -eq 0 ]; then
