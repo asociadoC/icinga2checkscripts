@@ -1,0 +1,58 @@
+#!/bin/sh
+
+while getopts ":u:p:h:t:" opt; do
+  case $opt in
+    u)
+      USERNAME=$OPTARG
+    ;;
+    p)
+      PASSWORD=$OPTARG
+    ;;
+    h) 
+      # foreman hostname
+      HOSTNAME=$OPTARG
+    ;;
+    t)
+      # time in minutes when a host has a out of sync
+      TIME=$OPTARG
+    ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+
+URL='https://'${HOSTNAME}'/api/v2/hosts?search=last_report+<+"'${TIME}'+minutes+ago"+and+status.enabled+%3D+true'
+
+echo ${URL}
+
+curl -s -k -u ${USERNAME}:${PASSWORD} ${URL} > /tmp/foreman.tmp
+
+if [ ! $? -eq 0 ]; then
+        echo "UNKNOWN: could not fetch results from foreman api"
+        exit 3
+fi
+
+CNTSUBHOSTS=0
+CNTHOSTS=`grep '"total"' /tmp/foreman.tmp | awk -F": " '{ print $2 }' | sed -e "s/,//g" `
+CNTSUBHOSTS=`grep '"subtotal"' /tmp/foreman.tmp | awk -F": " '{ print $2 }' | sed -e "s/,//g" `
+
+if [ $CNTSUBHOSTS -gt 0 ]; then
+        LONGOUT=`grep -oP '"name":"\K.*?(?=","id"|$)' /tmp/foreman.tmp`
+        MSG="WARNING: $CNTSUBHOSTS hosts out of $CNTHOSTS out of sync \n $LONGOUT"
+        RET=1
+elif [ $CNTSUBHOSTS -eq $CNTHOSTS ]; then
+        LONGOUT=`grep -oP '"name":"\K.*?(?=","id"|$)' /tmp/foreman.tmp`
+        MSG="CRITICAL: all hosts our of sync \n $LONGOUT"
+        RET=2
+elif [ $CNTSUBHOSTS -eq 0 ]; then
+        LONGOUT=`grep -oP '"name":"\K.*?(?=","id"|$)' /tmp/foreman.tmp`
+        MSG="OK: $CNTHOSTS all hosts in sync \n $LONGOUT"
+        RET=0
+fi
+
+rm -f /tmp/foreman*.tmp
+
+printf " $MSG "
+exit $RET
+

@@ -1,0 +1,47 @@
+#!/bin/sh
+
+while getopts ":u:p:h:" opt; do
+  case $opt in
+    u)
+      USERNAME=$OPTARG
+    ;;
+    p)
+      PASSWORD=$OPTARG
+    ;;
+    h) 
+      HOSTNAME=$OPTARG
+    ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      ;;
+  esac
+done
+
+URL='https://'${HOSTNAME}'/api/v2/hosts?search=last_report+>+"35+minutes+ago"+and+(status.failed+>+0+or+status.failed_restarts+>+0)+and+status.enabled+=+true'
+
+echo ${URL}
+
+curl -s -k -u ${USERNAME}:${PASSWORD} ${URL} > /tmp/foremanerrors.tmp
+
+if [ ! $? -eq 0 ]; then
+        echo "UNKNOWN: could not fetch results from foreman api"
+        exit 3
+fi
+
+CNTHOSTS=`grep '"total"' /tmp/foremanerrors.tmp | awk -F": " '{ print $2 }' | sed -e "s/,//g" `
+CNTERRHOSTS=`grep '"subtotal"' /tmp/foremanerrors.tmp | awk -F": " '{ print $2 }' | sed -e "s/,//g" `
+
+if [ $CNTERRHOSTS -gt 0 ]; then
+        LONGOUT=`grep -oP '"name":"\K.*?(?=","id"|$)' /tmp/foremanerrors.tmp`
+        MSG="CRITICAL: ${CNTERRHOSTS} hosts in error state"
+        RET=2
+elif [ $CNTERRHOSTS -eq 0 ]; then
+        LONGOUT=`grep -oP '"name":"\K.*?(?=","id"|$)' /tmp/foreman.tmp`
+        MSG="OK: no hosts in error state"
+        RET=0
+fi
+
+printf " $MSG "
+exit $RET
+
+
