@@ -24,8 +24,6 @@ done
 
 URL='https://'${HOSTNAME}'/api/v2/hosts?search=last_report+<+"'${TIME}'+minutes+ago"+and+status.enabled+%3D+true'
 
-echo ${URL}
-
 curl -s -k -u ${USERNAME}:${PASSWORD} ${URL} > /tmp/foreman.tmp
 
 if [ ! $? -eq 0 ]; then
